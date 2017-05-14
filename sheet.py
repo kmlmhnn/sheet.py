@@ -26,12 +26,12 @@ def get_cell(sheet, cell_id):
 def put(sheet, cell_id, value):
     cell = get_cell(sheet, cell_id)
 
-    if callable(value):
-        for parent_id in cell.parents:
-            parent_cell = get_cell(sheet, parent_id)
-            parent_cell.children.remove(cell_id)
+    for parent_id in cell.parents:
+        parent_cell = get_cell(sheet, parent_id)
+        parent_cell.children.remove(cell_id)
+    # old parents' children list is now ok.
 
-        # old parents' children list is now ok.
+    if callable(value):
         
         new_parents = list(inspect.signature(value).parameters)
 
@@ -40,6 +40,9 @@ def put(sheet, cell_id, value):
         for parent_id in new_parents:
             parent_cell = get_cell(sheet, parent_id)
             parent_cell.children.append(cell_id)
+
+    else:
+        cell.parents = []
 
     cell.expr = value
     evaluate(sheet, cell)
