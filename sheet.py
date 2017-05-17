@@ -20,15 +20,21 @@ class Row:
         self.children = []
         self.parents = []
 
+    def __repr__(self):
+        return "*".join([str(x) for x in (self.expr, self.children, self.parents)])
+
 class Column:
     def __init__(self):
         self.expr = None
         self.children = []
         self.parents = []
 
+    def __repr__(self):
+        return "*".join([str(x) for x in (self.expr, self.children, self.parents)])
+
 def get_row_col(id):
     match = re.search(r'^([a-zA-Z]+)([0-9]+)$', id)
-    return (match.group(1), match.group(2))
+    return ('_'+match.group(2), match.group(1))
 
 def create_sheet():
     return {}
@@ -57,7 +63,7 @@ def get_col(sheet, id):
 def get_type(id):
     if re.search(r'^[a-zA-Z]+$', id):
         return 'Column'
-    elif re.search(r'^[0-9]+$', id):
+    elif re.search(r'^_[0-9]+$', id):
         return 'Row'
     elif re.search(r'^([a-zA-Z]+)([0-9]+)$', id):
         return 'Cell'
@@ -78,7 +84,7 @@ def put(sheet, place, value):
                 parent = get_cell(sheet, parent_id)
             elif t == 'Row':
                 parent = get_row(sheet, parent_id)
-            elif t == 'Col':
+            elif t == 'Column':
                 parent = get_col(sheet, parent_id)
             else:
                 raise Exception
@@ -109,17 +115,19 @@ def put(sheet, place, value):
             cell.parents = []
 
         cell.expr = value
-        evaluate(sheet, cell)
+        evaluate(sheet, cell, place) # evaluate works only on individual cells
+        # Hence place must be a cell_id.
 
         return cell
     except:
-        print(place + ' is not a valid cell.', file=sys.stderr)
+        # print(place + ' is not a valid cell.', file=sys.stderr)
+        print('oops')
         return None
 
 def get(sheet, cell_id):
     return get_cell(sheet, cell_id).val
 
-def evaluate(sheet, cell):
+def evaluate(sheet, cell, cell_id):
     if not callable(cell.expr):
         cell.val = cell.expr
     else:
@@ -132,23 +140,28 @@ def evaluate(sheet, cell):
                 args.append(get_cell(sheet, parent_id).val)
             elif t == "Row":
                 cells_in_row = get_cells_in_row(sheet, parent_id)
-                args.extend(cells_in_row)
+                cells = [cell for (cell, id) in cells_in_row]
+                args.append(cells)
             elif t == "Column":
                 cells_in_col = get_cells_in_col(sheet, parent_id)
-                args.extend(cells_in_col)
+                cells = [cell for (cell, id) in cells_in_col]
+                args.append(cells)
             else:
                 raise Exception
 
-        try:
-            cell.val = cell.expr(*args)
-        except:
-            cell.val = cell.expr(args)
-
+        cell.val = cell.expr(*args)
 
 
 
     for child_id in cell.children:
-        evaluate(sheet, get_cell(sheet, child_id))
+        evaluate(sheet, get_cell(sheet, child_id), child_id)
+
+
+    row_id, col_id = get_row_col(cell_id) 
+    children = get_row(sheet, row_id).children + get_col(sheet, col_id).children
+    for child in children:
+        evaluate(sheet, get_cell(sheet, child), child)
+
 
 def get_cells_in_col(sheet, col_id):
     cell_ids = []
@@ -156,15 +169,15 @@ def get_cells_in_col(sheet, col_id):
     for id in sheet.keys():
         if re.search(pattern, id):
             cell_ids.append(id)
-    return [get_cell(sheet, id).val for id in cell_ids]
+    return [(get_cell(sheet, id).val, id) for id in cell_ids]
 
 def get_cells_in_row(sheet, row_id):
     cell_ids = []
-    pattern = r'^[a-zA-Z]+%s$' % row_id
+    pattern = r'^[a-zA-Z]+%s$' % row_id[1:]
     for id in sheet.keys():
         if re.search(pattern, id):
             cell_ids.append(id)
-    return [get_cell(sheet, id).val for id in cell_ids]
+    return [(get_cell(sheet, id).val, id) for id in cell_ids]
 
 
 
@@ -172,11 +185,22 @@ if __name__ == '__main__':
 
     s = create_sheet()
 
-    put(s, 'a1', 1)
-    put(s, 'a2', 2)
-    put(s, 'a3', 3)
-    put(s, 'a4', 4)
     pdb.set_trace()
+
+    put(s, 'a1', 10)
+    put(s, 'a2', 20)
     put(s, 'b1', lambda a: sum(a))
 
-
+    # put(s, 'a1', 1)
+    # put(s, 'a2', 2)
+    # put(s, 'a3', 3)
+    # put(s, 'a4', 4)
+    # put(s, 'b1', lambda a: sum(a)) # This now works. column aggregation works.
+# 
+    # put(s, 'a10', 100)
+    # put(s, 'b10', 200)
+    # put(s, 'c10', 300)
+    # put(s, 'd10', 400)
+    # put(s, 'b2', lambda _10: sum(_10))
+# 
+# 
