@@ -74,6 +74,7 @@ def get_type(id):
 
 def put(sheet, place, value):
     try:
+        # pdb.set_trace()
         cell = get_cell(sheet, place)
 
         row_id, col_id = get_row_col(place) # Raises exception
@@ -149,7 +150,10 @@ def evaluate(sheet, cell, cell_id):
             else:
                 raise Exception
 
-        cell.val = cell.expr(*args)
+        try:
+            cell.val = cell.expr(*args) # All cells maynot be initialized
+        except TypeError:
+            cell.val = None
 
 
 
@@ -185,11 +189,16 @@ if __name__ == '__main__':
 
     s = create_sheet()
 
-    pdb.set_trace()
+    # pdb.set_trace()
 
-    put(s, 'a1', 10)
-    put(s, 'a2', 20)
-    put(s, 'b1', lambda a: sum(a))
+    # put(s, 'a1', 10)
+    # put(s, 'a2', 20)
+    # put(s, 'b1', lambda a: sum(a))
+
+    put(s, 'a10', 3)
+    put(s, 'b10', 3)
+    put(s, 'c10', 3)
+    put(s, 'b2', lambda _10: sum(_10))
 
     # put(s, 'a1', 1)
     # put(s, 'a2', 2)
@@ -197,10 +206,10 @@ if __name__ == '__main__':
     # put(s, 'a4', 4)
     # put(s, 'b1', lambda a: sum(a)) # This now works. column aggregation works.
 # 
-    # put(s, 'a10', 100)
-    # put(s, 'b10', 200)
-    # put(s, 'c10', 300)
-    # put(s, 'd10', 400)
-    # put(s, 'b2', lambda _10: sum(_10))
+# put(s, 'a10', 100)
+# put(s, 'b10', 200)
+# put(s, 'c10', 300)
+# put(s, 'd10', 400)
+# put(s, 'b2', lambda _10: sum(_10))
 # 
 # 
