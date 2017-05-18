@@ -14,7 +14,7 @@ class Cell:
     def __repr__(self):
         return "*".join([str(x) for x in (self.val, self.expr, self.children, self.parents)])
 
-class Row:
+class Aggregate:
     def __init__(self):
         self.expr = None
         self.children = []
@@ -23,14 +23,12 @@ class Row:
     def __repr__(self):
         return "*".join([str(x) for x in (self.expr, self.children, self.parents)])
 
-class Column:
-    def __init__(self):
-        self.expr = None
-        self.children = []
-        self.parents = []
 
-    def __repr__(self):
-        return "*".join([str(x) for x in (self.expr, self.children, self.parents)])
+class Row(Aggregate):
+    pass
+
+class Column(Aggregate):
+    pass
 
 def get_row_col(id):
     match = re.search(r'^([a-zA-Z]+)([0-9]+)$', id)
