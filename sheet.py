@@ -6,6 +6,7 @@ import sys
 
 class Cell:
     def __init__(self):
+        self.id = None
         self.val = None
         self.expr = None
         self.children = []
@@ -16,6 +17,7 @@ class Cell:
 
 class Aggregate:
     def __init__(self):
+        self.id = None
         self.expr = None
         self.children = []
         self.parents = []
@@ -42,6 +44,7 @@ def get_unit(sheet, id, ctor):
     unit = sheet.get(id)
     if not unit:
         unit = ctor()
+        unit.id = id
         sheet[id] = unit
     return unit
 
@@ -71,26 +74,23 @@ def put(sheet, id, value):
         cell = get_cell(sheet, id)
 
         for parent in cell.parents:
-            ctor = select_ctor(parent)
-            parent = get_unit(sheet, parent, ctor) # parent was a str. Now its a Cell
-            parent.children.remove(id)
+            parent.children.remove(cell)
                 
         if callable(value):
-            new_parents = list(inspect.signature(value).parameters)
+            new_parents = []
+            for pid in list(inspect.signature(value).parameters):
+                new_parent = get_unit(sheet, pid, select_ctor(pid))
+                new_parent.children.append(cell)
+                new_parents.append(new_parent)
             cell.parents = new_parents
-            for parent in new_parents:
-                ctor = select_ctor(parent)
-                parent = get_unit(sheet, parent, ctor)
-                parent.children.append(id)
-
         else:
             cell.parents = []
 
         cell.expr = value
 
         row, col = extract_row_col(id) 
-        get_row(sheet, row).members.add(id) 
-        get_col(sheet, col).members.add(id)
+        get_row(sheet, row).members.add(cell) 
+        get_col(sheet, col).members.add(cell)
         
         evaluate(sheet, cell, id) 
 
@@ -111,11 +111,11 @@ def evaluate(sheet, cell, id):
     else:
         args = []
         for parent in cell.parents:
-            ctor = select_ctor(parent)
-            if ctor is Cell:
-                args.append(get_cell(sheet, parent).val)
+            if type(parent) is Cell:
+                args.append(parent.val)
             else:
-                args.append([get_cell(sheet, id).val for id in get_unit(sheet, parent, ctor).members])
+                args.append([member.val for member in 
+                    get_unit(sheet, parent.id, type(parent)).members])
 
         try:
             cell.val = cell.expr(*args) # All cells maynot be initialized
@@ -123,11 +123,19 @@ def evaluate(sheet, cell, id):
             cell.val = None
 
     for child in cell.children:
-        evaluate(sheet, get_cell(sheet, child), child)
+        evaluate(sheet, child, child.id)
 
     row, col = extract_row_col(id) 
     children = get_row(sheet, row).children + get_col(sheet, col).children
     for child in children:
-        evaluate(sheet, get_cell(sheet, child), child)
+        evaluate(sheet, child, child.id)
+
+
+if __name__ == "__main__":
+    s = {}
+    pdb.set_trace()
+    put(s, 'a1', 10)
+    put(s, 'a2', 20)
+    put(s, 'b1', lambda a: sum(a))
 
 
