@@ -9,11 +9,13 @@ class Cell:
         self.id = None
         self.val = None
         self.expr = None
+        self.row = None
+        self.col = None
         self.children = []
         self.parents = []
     
     def __repr__(self):
-        return "*".join([str(x) for x in (self.val, self.expr, self.children, self.parents)])
+        return self.val
 
 class Aggregate:
     def __init__(self):
@@ -22,10 +24,6 @@ class Aggregate:
         self.children = []
         self.parents = []
         self.members = set()
-
-    def __repr__(self):
-        return "*".join([str(x) for x in (self.expr, self.children, self.parents)])
-
 
 class Row(Aggregate):
     pass
@@ -51,12 +49,6 @@ def get_unit(sheet, id, ctor):
 def get_cell(sheet, id):
     return get_unit(sheet, id, Cell)
 
-def get_row(sheet, id):
-    return get_unit(sheet, id, Row)
-
-def get_col(sheet, id):
-    return get_unit(sheet, id, Column)
-
 def select_ctor(id):
     if re.search(r'^[a-zA-Z]+$', id):
         return Column
@@ -65,7 +57,7 @@ def select_ctor(id):
     elif re.search(r'^([a-zA-Z]+)([0-9]+)$', id):
         return Cell
     else:
-        raise ValueError(id, 'is not a valid unit.')
+        raise ValueError(id + 'is not a valid unit.')
 
 def put(sheet, id, value):
     kind = select_ctor(id)
@@ -89,8 +81,10 @@ def put(sheet, id, value):
         cell.expr = value
 
         row, col = extract_row_col(id) 
-        get_row(sheet, row).members.add(cell) 
-        get_col(sheet, col).members.add(cell)
+        cell.row = get_unit(sheet, row, Row)
+        cell.col = get_unit(sheet, col, Column)
+        cell.row.members.add(cell) 
+        cell.col.members.add(cell) 
         
         evaluate(sheet, cell, id) 
 
@@ -125,8 +119,7 @@ def evaluate(sheet, cell, id):
     for child in cell.children:
         evaluate(sheet, child, child.id)
 
-    row, col = extract_row_col(id) 
-    children = get_row(sheet, row).children + get_col(sheet, col).children
+    children = cell.row.children + cell.col.children
     for child in children:
         evaluate(sheet, child, child.id)
 
@@ -137,5 +130,6 @@ if __name__ == "__main__":
     put(s, 'a1', 10)
     put(s, 'a2', 20)
     put(s, 'b1', lambda a: sum(a))
+    get(s, 'b1')
 
 
