@@ -15,7 +15,7 @@ class Cell:
         self.parents = []
     
     def __repr__(self):
-        return self.val
+        return str(self.val)
 
 class Aggregate:
     def __init__(self):
