@@ -19,6 +19,7 @@ class Aggregate:
         self.expr = None
         self.children = []
         self.parents = []
+        self.members = set()
 
     def __repr__(self):
         return "*".join([str(x) for x in (self.expr, self.children, self.parents)])
@@ -86,6 +87,11 @@ def put(sheet, id, value):
             cell.parents = []
 
         cell.expr = value
+
+        row, col = extract_row_col(id) 
+        get_row(sheet, row).members.add(id) 
+        get_col(sheet, col).members.add(id)
+        
         evaluate(sheet, cell, id) 
 
         return cell
@@ -94,7 +100,10 @@ def put(sheet, id, value):
         return None
 
 def get(sheet, cell):
-    return get_cell(sheet, cell).val
+    if select_ctor(cell) is Cell:
+        return get_cell(sheet, cell).val
+    else:
+        print('get works only on cells')
 
 def evaluate(sheet, cell, id):
     if not callable(cell.expr):
@@ -106,7 +115,7 @@ def evaluate(sheet, cell, id):
             if ctor is Cell:
                 args.append(get_cell(sheet, parent).val)
             else:
-                args.append([get_cell(sheet, id).val for id in get_cells_in_aggregate(sheet, parent, ctor)])
+                args.append([get_cell(sheet, id).val for id in get_unit(sheet, parent, ctor).members])
 
         try:
             cell.val = cell.expr(*args) # All cells maynot be initialized
@@ -120,19 +129,5 @@ def evaluate(sheet, cell, id):
     children = get_row(sheet, row).children + get_col(sheet, col).children
     for child in children:
         evaluate(sheet, get_cell(sheet, child), child)
-
-
-def get_cells_in_aggregate(sheet, agg, ctor):
-    if ctor is Column:
-        pattern = r'^%s[0-9]+$' % agg
-    else:
-        pattern = r'^[a-zA-Z]+%s$' % agg[1:]
-
-    cells = []
-    for id in sheet.keys():
-        if re.search(pattern, id):
-            cells.append(id)
-    return [id for id in cells]
-    
 
 
