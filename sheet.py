@@ -30,8 +30,8 @@ class Row(Aggregate):
 class Column(Aggregate):
     pass
 
-def extract_row_col_ids(cell_id):
-    match = re.search(r'^([a-zA-Z]+)([0-9]+)$', cell_id)
+def extract_row_col(cell):
+    match = re.search(r'^([a-zA-Z]+)([0-9]+)$', cell)
     return ('_'+match.group(2), match.group(1))
 
 def create_sheet():
@@ -53,17 +53,7 @@ def get_row(sheet, id):
 def get_col(sheet, id):
     return get_unit(sheet, id, Column)
 
-def get_type(id):
-    if re.search(r'^[a-zA-Z]+$', id):
-        return 'Column'
-    elif re.search(r'^_[0-9]+$', id):
-        return 'Row'
-    elif re.search(r'^([a-zA-Z]+)([0-9]+)$', id):
-        return 'Cell'
-    else:
-        return None
-
-def get_ctor(id):
+def select_ctor(id):
     if re.search(r'^[a-zA-Z]+$', id):
         return Column
     elif re.search(r'^_[0-9]+$', id):
@@ -71,90 +61,78 @@ def get_ctor(id):
     elif re.search(r'^([a-zA-Z]+)([0-9]+)$', id):
         return Cell
     else:
-        return None
-
-
-
+        raise ValueError(id, 'is not a valid unit.')
 
 def put(sheet, id, value):
-    try:
-        # pdb.set_trace()
+    kind = select_ctor(id)
+
+    if kind is Cell:
         cell = get_cell(sheet, id)
 
-        row_id, col_id = extract_row_col_ids(id) # Raises exception
-
-        for parent_id in cell.parents:
-            ctor = get_ctor(parent_id)
-            parent = get_unit(sheet, parent_id, ctor)
+        for parent in cell.parents:
+            ctor = select_ctor(parent)
+            parent = get_unit(sheet, parent, ctor) # parent was a str. Now its a Cell
             parent.children.remove(id)
                 
-        # old parents' children list is now ok.
-
         if callable(value):
-            
             new_parents = list(inspect.signature(value).parameters)
-
             cell.parents = new_parents
-
-            for parent_id in new_parents:
-                ctor = get_ctor(parent_id)
-                parent = get_unit(sheet, parent_id, ctor)
+            for parent in new_parents:
+                ctor = select_ctor(parent)
+                parent = get_unit(sheet, parent, ctor)
                 parent.children.append(id)
-
 
         else:
             cell.parents = []
 
         cell.expr = value
-        evaluate(sheet, cell, id) # evaluate works only on individual cells
-        # Hence id must be a cell_id.
+        evaluate(sheet, cell, id) 
 
         return cell
-    except:
-        # print(id + ' is not a valid cell.', file=sys.stderr)
-        print('oops')
+    else:
+        print('Cant handle non cell lvalues yet.')
         return None
 
-def get(sheet, cell_id):
-    return get_cell(sheet, cell_id).val
+def get(sheet, cell):
+    return get_cell(sheet, cell).val
 
-def evaluate(sheet, cell, cell_id):
+def evaluate(sheet, cell, id):
     if not callable(cell.expr):
         cell.val = cell.expr
     else:
         args = []
-        for parent_id in cell.parents:
-            ctor = get_ctor(parent_id)
-            if ctor == Cell:
-                args.append(get_cell(sheet, parent_id).val)
+        for parent in cell.parents:
+            ctor = select_ctor(parent)
+            if ctor is Cell:
+                args.append(get_cell(sheet, parent).val)
             else:
-                args.append([get_cell(sheet, id).val for id in get_cells_in_aggregate(sheet, parent_id, ctor)])
+                args.append([get_cell(sheet, id).val for id in get_cells_in_aggregate(sheet, parent, ctor)])
 
         try:
             cell.val = cell.expr(*args) # All cells maynot be initialized
         except TypeError:
             cell.val = None
 
-    for child_id in cell.children:
-        evaluate(sheet, get_cell(sheet, child_id), child_id)
+    for child in cell.children:
+        evaluate(sheet, get_cell(sheet, child), child)
 
-    row_id, col_id = extract_row_col_ids(cell_id) 
-    children = get_row(sheet, row_id).children + get_col(sheet, col_id).children
+    row, col = extract_row_col(id) 
+    children = get_row(sheet, row).children + get_col(sheet, col).children
     for child in children:
         evaluate(sheet, get_cell(sheet, child), child)
 
 
-def get_cells_in_aggregate(sheet, agg_id, ctor):
-    cell_ids = []
-    if ctor == Column:
-        pattern = r'^%s[0-9]+$' % agg_id
+def get_cells_in_aggregate(sheet, agg, ctor):
+    if ctor is Column:
+        pattern = r'^%s[0-9]+$' % agg
     else:
-        pattern = r'^[a-zA-Z]+%s$' % agg_id[1:]
+        pattern = r'^[a-zA-Z]+%s$' % agg[1:]
 
+    cells = []
     for id in sheet.keys():
         if re.search(pattern, id):
-            cell_ids.append(id)
-    return [id for id in cell_ids]
+            cells.append(id)
+    return [id for id in cells]
     
 
 
