@@ -123,13 +123,3 @@ def evaluate(sheet, cell, id):
     for child in children:
         evaluate(sheet, child, child.id)
 
-
-if __name__ == "__main__":
-    s = {}
-    pdb.set_trace()
-    put(s, 'a1', 10)
-    put(s, 'a2', 20)
-    put(s, 'b1', lambda a: sum(a))
-    get(s, 'b1')
-
-
